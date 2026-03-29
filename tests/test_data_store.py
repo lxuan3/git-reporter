@@ -1,4 +1,3 @@
-import json
 from datetime import date
 from report_builder import PersonReport, RepoStats
 from data_store import save_snapshot, query_range

@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS daily_snapshots (
     lines_added   INTEGER NOT NULL,
     lines_deleted INTEGER NOT NULL,
     files_changed INTEGER NOT NULL,
-    messages      TEXT NOT NULL
+    messages      TEXT NOT NULL,
+    UNIQUE(date, person, repo)
 )
 """
 
@@ -31,11 +32,7 @@ def save_snapshot(report: dict, target_date: date, db_path: str = "git_reporter.
         for person in report["persons"]:
             for repo_name, stats in person.repos.items():
                 conn.execute(
-                    "DELETE FROM daily_snapshots WHERE date=? AND person=? AND repo=?",
-                    (date_str, person.display_name, repo_name),
-                )
-                conn.execute(
-                    "INSERT INTO daily_snapshots VALUES (?,?,?,?,?,?,?,?)",
+                    "INSERT OR REPLACE INTO daily_snapshots VALUES (?,?,?,?,?,?,?,?)",
                     (
                         date_str,
                         person.display_name,
