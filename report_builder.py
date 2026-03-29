@@ -3,6 +3,9 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
+from config import Config, ScoringConfig
+from git_collector import CommitData
+
 PREFIX_MAP = {
     "feat": "新功能", "fix": "修复", "chore": "维护",
     "refactor": "重构", "docs": "文档", "style": "样式",
@@ -34,12 +37,12 @@ class RepoStats:
     lines_added: int = 0
     lines_deleted: int = 0
     files_changed: int = 0
-    messages: list = field(default_factory=list)
+    messages: list[str] = field(default_factory=list)
 
 @dataclass
 class PersonReport:
     display_name: str
-    repos: dict = field(default_factory=dict)   # repo_name -> RepoStats
+    repos: dict[str, RepoStats] = field(default_factory=dict)
 
     @property
     def total_commits(self):
@@ -53,10 +56,10 @@ class PersonReport:
     def total_lines_deleted(self):
         return sum(r.lines_deleted for r in self.repos.values())
 
-def compute_score(person: PersonReport, scoring) -> float:
+def compute_score(person: PersonReport, scoring: ScoringConfig) -> float:
     return person.total_commits * scoring.commit_weight + person.total_lines_added * scoring.lines_weight
 
-def build_report(repo_commits: dict, config, target_date: date) -> dict:
+def build_report(repo_commits: dict[str, list[CommitData]], config: Config, target_date: date) -> dict:
     """
     repo_commits: {repo_name: [CommitData]}
     Returns structured report dict.
