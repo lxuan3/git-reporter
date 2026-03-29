@@ -65,7 +65,8 @@ def test_dedup_across_branches():
             m.stdout = same_output
         return m
 
-    with patch("git_collector.subprocess.run", side_effect=fake_run):
+    with patch("git_collector.subprocess.run", side_effect=fake_run), \
+         patch("git_collector.os.path.exists", return_value=True):
         commits, warnings = collect_repo("/fake/repo", ["main", "develop"], date(2026, 3, 29))
 
     assert len(commits) == 1    # 两个 branch 里的同一 commit 只计一次
@@ -82,7 +83,8 @@ def test_pull_failure_returns_warning():
         m.stdout = ""
         return m
 
-    with patch("git_collector.subprocess.run", side_effect=fake_run):
+    with patch("git_collector.subprocess.run", side_effect=fake_run), \
+         patch("git_collector.os.path.exists", return_value=True):
         commits, warnings = collect_repo("/fake/repo", ["main"], date(2026, 3, 29))
 
     assert commits == []

@@ -1,4 +1,5 @@
 # git_collector.py
+import os
 import subprocess
 from dataclasses import dataclass
 from datetime import date
@@ -77,11 +78,29 @@ def _pull_branch(repo_path: str, branch: str) -> bool:
                         cwd=repo_path, capture_output=True, text=True)
     return r2.returncode == 0
 
-def collect_repo(repo_path: str, branches: list[str], target_date: date) -> tuple[list[CommitData], list[str]]:
+def _ensure_cloned(repo_path: str, remote: str) -> tuple[bool, str]:
+    """本地路径不存在时自动 clone。返回 (success, warning_or_empty)。"""
+    if os.path.exists(repo_path):
+        return True, ""
+    if not remote:
+        return False, f"路径不存在且未配置 remote：{repo_path}"
+    result = subprocess.run(
+        ["git", "clone", remote, repo_path],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        return False, f"git clone 失败：{remote} → {repo_path}（{result.stderr.strip()}）"
+    return True, ""
+
+def collect_repo(repo_path: str, branches: list[str], target_date: date, remote: str = "") -> tuple[list[CommitData], list[str]]:
     """
     Returns (commits: list[CommitData], warnings: list[str]).
-    commits 已按 hash 去重。
+    commits 已按 hash 去重。若本地路径不存在且配置了 remote，自动 clone。
     """
+    ok, warn = _ensure_cloned(repo_path, remote)
+    if not ok:
+        return [], [warn]
+
     since = target_date.strftime("%Y-%m-%d 00:00:00")
     until = target_date.strftime("%Y-%m-%d 23:59:59")
 

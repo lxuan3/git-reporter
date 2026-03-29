@@ -7,6 +7,7 @@ class RepoConfig:
     name: str
     path: str
     branches: list[str]  # 空列表 = 使用当前 checkout 的 branch
+    remote: str = ""     # 可选远程 URL，路径不存在时自动 clone
 
 @dataclass
 class ScoringConfig:
@@ -35,6 +36,7 @@ def load_config(path: str = "config.yaml") -> Config:
             name=r["name"],
             path=r["path"],
             branches=r.get("branches", []),
+            remote=r.get("remote", ""),
         )
         for r in data["repos"]
     ]
