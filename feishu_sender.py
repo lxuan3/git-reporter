@@ -8,6 +8,11 @@ def _line(*texts) -> list:
     return [_text(t) for t in texts]
 
 def build_payload(report: dict) -> dict:
+    """Build Feishu webhook payload from report dict.
+
+    Expects report['persons'] to be pre-sorted: active (total_commits > 0) first,
+    inactive last. Call build_report() from report_builder to get this ordering.
+    """
     if report["total_commits"] == 0:
         return {"msg_type": "text", "content": {"text": "📊 今日暂无提交记录"}}
 
@@ -71,8 +76,9 @@ def send_report(webhook_url: str, report: dict) -> bool:
     resp.raise_for_status()
     return resp.json().get("code") == 0
 
-def send_warnings(webhook_url: str, warnings: list) -> None:
+def send_warnings(webhook_url: str, warnings: list[str]) -> None:
     if not warnings:
         return
     text = "⚠️ Git 报告采集警告：\n" + "\n".join(f"- {w}" for w in warnings)
-    requests.post(webhook_url, json={"msg_type": "text", "content": {"text": text}}, timeout=10)
+    resp = requests.post(webhook_url, json={"msg_type": "text", "content": {"text": text}}, timeout=10)
+    resp.raise_for_status()
