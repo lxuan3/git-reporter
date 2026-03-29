@@ -1,0 +1,20 @@
+# config.yaml.example
+feishu:
+  webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_TOKEN"
+
+scoring:
+  commit_weight: 10   # score = commits × commit_weight + lines_added × lines_weight
+  lines_weight: 1
+
+# git email 或 git username → 真实姓名（优先匹配 email）
+members:
+  "zhangsan@example.com": "张三"
+  "lisi": "李四"
+
+repos:
+  - name: "openclaw-dashboard"
+    path: "/Users/hypernode/Github/openclaw-dashboard"
+    branches: ["main", "develop"]   # 不填则使用当前 checkout 的 branch
+  - name: "service-manager"
+    path: "/Users/hypernode/Github/service-manager"
+    # branches 未填 → 使用当前 branch
