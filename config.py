@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 class RepoConfig:
     name: str
     path: str
-    branches: list  # 空列表 = 使用当前 checkout 的 branch
+    branches: list[str]  # 空列表 = 使用当前 checkout 的 branch
 
 @dataclass
 class ScoringConfig:
@@ -16,8 +16,8 @@ class ScoringConfig:
 @dataclass
 class Config:
     feishu_webhook_url: str
-    members: dict        # git email/username → 真实姓名
-    repos: list          # list[RepoConfig]
+    members: dict[str, str]        # git email/username → 真实姓名
+    repos: list[RepoConfig]          # list[RepoConfig]
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
 
 def load_config(path: str = "config.yaml") -> Config:
