@@ -1,12 +1,13 @@
 # main.py
 import sys
 from datetime import date
+from typing import Optional
 from config import load_config
 from git_collector import collect_repo
 from report_builder import build_report
 from feishu_sender import send_report, send_warnings
 
-def run(config_path: str = "config.yaml", target_date: date = None):
+def run(config_path: str = "config.yaml", target_date: Optional[date] = None):
     if target_date is None:
         target_date = date.today()
 
