@@ -13,7 +13,7 @@ class CommitData:
     lines_added: int
     lines_deleted: int
 
-def _parse_git_log(output: str) -> list:
+def _parse_git_log(output: str) -> list[CommitData]:
     """解析 git log --format='COMMIT|%H|%ae|%an|%s' --numstat 的输出。"""
     commits = []
     current = None
@@ -77,7 +77,7 @@ def _pull_branch(repo_path: str, branch: str) -> bool:
                         cwd=repo_path, capture_output=True, text=True)
     return r2.returncode == 0
 
-def collect_repo(repo_path: str, branches: list, target_date: date) -> tuple:
+def collect_repo(repo_path: str, branches: list[str], target_date: date) -> tuple[list[CommitData], list[str]]:
     """
     Returns (commits: list[CommitData], warnings: list[str]).
     commits 已按 hash 去重。
