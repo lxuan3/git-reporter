@@ -21,7 +21,7 @@ def _find_backup_risks(rows: list[dict], week_start: date, week_end: date) -> li
 
 
 def _find_silent_persons(all_names: list[str], rows: list[dict], week_start: date) -> list[dict]:
-    """返回整周（7天）零提交的成员列表，带 silent_days=7。"""
+    """返回整周（7天）零提交的成员列表。"""
     active_persons: set[str] = set()
     week_end = (week_start + timedelta(days=6)).isoformat()
     ws = week_start.isoformat()
@@ -29,7 +29,7 @@ def _find_silent_persons(all_names: list[str], rows: list[dict], week_start: dat
         if ws <= row["date"] <= week_end and row["commits"] > 0:
             active_persons.add(row["person"])
     return [
-        {"name": name, "silent_days": 7}
+        {"name": name}
         for name in all_names
         if name not in active_persons
     ]
@@ -99,7 +99,7 @@ def build_weekly_report(rows: list[dict], cfg: Config, week_start: date) -> dict
         "persons": persons,
         "top_person": top_person,
         "silent_persons": _find_silent_persons(all_names, curr_rows, week_start),
-        "backup_risks": _find_backup_risks(rows, week_start, week_end),
+        "backup_risks": _find_backup_risks(curr_rows, week_start, week_end),
         "team_momentum_pct": team_momentum_pct,
         "total_commits": total_curr,
     }

@@ -79,3 +79,40 @@ def test_team_momentum_no_baseline():
     rows = [_row("张三", "api", 5, week_start)]
     report = build_weekly_report(rows, cfg, week_start)
     assert report["team_momentum_pct"] is None
+
+def test_send_weekly_report_calls_feishu():
+    from unittest.mock import patch, MagicMock
+    from weekly_reporter import send_weekly_report
+
+    report = {
+        "week_label": "2026-W13（03/23–03/29）",
+        "total_commits": 15,
+        "team_momentum_pct": 25,
+        "top_person": {"name": "张三", "total_commits": 10},
+        "silent_persons": [],
+        "backup_risks": [{"repo": "sdk-core", "person": "李四"}],
+        "persons": [
+            {"name": "张三", "total_commits": 10, "total_lines_added": 500, "repos_active": 2, "vs_prev_week_pct": 25},
+            {"name": "李四", "total_commits": 5, "total_lines_added": 200, "repos_active": 1, "vs_prev_week_pct": None},
+        ],
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("weekly_reporter.requests.post", return_value=mock_resp) as mock_post:
+        send_weekly_report("https://example.com/webhook", report)
+
+    mock_post.assert_called_once()
+    payload = mock_post.call_args[1]["json"]
+    assert payload["msg_type"] == "post"
+    content = payload["content"]["post"]["zh_cn"]
+    assert "研发周报" in content["title"]
+    all_text = " ".join(
+        item["text"]
+        for line in content["content"]
+        for item in line
+    )
+    assert "张三" in all_text
+    assert "sdk-core" in all_text
+    assert "↑25%" in all_text
