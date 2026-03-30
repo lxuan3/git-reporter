@@ -11,28 +11,15 @@ from git_collector import collect_repo
 from report_builder import build_report
 
 
-def _build_all_data(rows: list[dict], persons: list[str]) -> dict:
+def _build_all_data(rows: list[dict], persons: list[str], generated_at: "str | None" = None) -> dict:
     """将 query_range 返回的行转换为仪表盘所需的 JSON 数据结构。"""
     all_dates = sorted(set(r["date"] for r in rows))
     all_repos = sorted(set(r["repo"] for r in rows))
 
-    timeline: dict[str, list[int]] = {p: [] for p in persons}
-    for d in all_dates:
-        day_rows = {(r["person"], r["repo"]): r for r in rows if r["date"] == d}
-        for person in persons:
-            total = sum(
-                day_rows[(person, repo)]["commits"]
-                for repo in all_repos
-                if (person, repo) in day_rows
-            )
-            timeline[person].append(total)
+    if generated_at is None:
+        generated_at = (all_dates[-1] if all_dates else date.today().isoformat())
 
-    coverage: dict[str, dict[str, int]] = {p: {r: 0 for r in all_repos} for p in persons}
-    for row in rows:
-        if row["person"] in coverage and row["repo"] in coverage[row["person"]]:
-            coverage[row["person"]][row["repo"]] += row["commits"]
-
-    today = date.fromisoformat(all_dates[-1]) if all_dates else date.today()
+    today = date.fromisoformat(generated_at)
     weekly_totals = []
     for w in range(8):
         w_end = today - timedelta(days=w * 7)
@@ -44,12 +31,9 @@ def _build_all_data(rows: list[dict], persons: list[str]) -> dict:
         weekly_totals.insert(0, {"label": w_start.strftime("W%V"), "total": total})
 
     return {
-        "generated_at": date.today().isoformat(),
+        "generated_at": generated_at,
         "persons": persons,
         "repos": all_repos,
-        "dates": all_dates,
-        "timeline": timeline,
-        "coverage": coverage,
         "rows": rows,
         "weekly_totals": weekly_totals,
     }
@@ -58,7 +42,7 @@ def _build_all_data(rows: list[dict], persons: list[str]) -> dict:
 def generate_html(rows: list[dict], persons: list[str], initial_range: int = 30) -> str:
     """生成完整的自包含 HTML 字符串。rows 应包含至多 90 天数据，initial_range 设置初始显示范围。"""
     data = _build_all_data(rows, persons)
-    data_json = json.dumps(data, ensure_ascii=False)
+    data_json = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
 
     return f"""<!DOCTYPE html>
 <html lang="zh">
