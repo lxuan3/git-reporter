@@ -65,12 +65,17 @@ def build_report(repo_commits: dict[str, list[CommitData]], config: Config, targ
     Returns structured report dict.
     """
     person_data: dict[str, PersonReport] = {}
+    person_seen_hashes: dict[str, set] = {}  # 跨 repo 按人去重
 
     for repo_name, commits in repo_commits.items():
         for commit in commits:
             name = resolve_name(commit.author_email, commit.author_name, config.members)
             if name not in person_data:
                 person_data[name] = PersonReport(display_name=name)
+                person_seen_hashes[name] = set()
+            if commit.hash in person_seen_hashes[name]:
+                continue
+            person_seen_hashes[name].add(commit.hash)
             if repo_name not in person_data[name].repos:
                 person_data[name].repos[repo_name] = RepoStats()
             stats = person_data[name].repos[repo_name]

@@ -5,10 +5,11 @@
 ## 功能
 
 - 支持多个 repo、每个 repo 可配置多个监控 branch
+- 跨 repo / branch 按 commit hash 去重，同一个 commit 同步到多个分支只计一次
 - 按成员归并 commit，git email 和 username 均可映射到真实姓名
 - 自动识别 Conventional Commits 前缀（`feat` → 新功能、`fix` → 修复 等）
 - 报告按贡献评分排序，标注 🥇🥈 Top 2 贡献者
-- 每晚 20:30 定时推送到飞书群机器人
+- 支持每周汇总报告（`--weekly`）
 - 预留 AI 总结接口，初期不启用
 
 ## 报告示例
@@ -41,7 +42,7 @@
 
 ```bash
 git clone <repo-url>
-cd git_reporter
+cd git-reporter
 pip3 install -r requirements.txt
 ```
 
@@ -73,42 +74,96 @@ repos:
     path: "/path/to/service-manager"
 ```
 
+### 多分支去重说明
+
+同一个 commit 经常被同步（cherry-pick / merge）到多个分支。git-reporter 会在汇总时按 commit hash 全局去重，同一个人的同一个 commit 无论出现在几个 repo/branch 中，只计一次。
+
 ## 使用
 
-**手动运行（测试用）：**
+**手动运行（dry-run，不发送飞书）：**
 
 ```bash
-# 运行今天的报告
+python3 main.py config.yaml --dry-run
+```
+
+**指定日期：**
+
+```bash
+python3 main.py config.yaml 2026-03-29 --dry-run
+```
+
+**正式发送到飞书：**
+
+```bash
 python3 main.py config.yaml
-
-# 指定日期
-python3 main.py config.yaml 2026-03-29
 ```
 
-**定时任务（每晚 20:30）：**
+**每周汇总报告：**
 
 ```bash
-crontab -e
+python3 main.py config.yaml --weekly
 ```
 
-添加：
+## 定时任务（macOS launchd）
 
-```cron
-30 20 * * * cd /path/to/git_reporter && /usr/bin/python3 main.py config.yaml >> /tmp/git_reporter.log 2>&1
+推荐使用 launchd 而非 crontab，锁屏不影响执行。
+
+创建 `~/Library/LaunchAgents/com.yourname.git-reporter.plist`：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yourname.git-reporter</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/path/to/git-reporter/main.py</string>
+        <string>/path/to/git-reporter/config.yaml</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>20</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/path/to/git-reporter/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/path/to/git-reporter/launchd.log</string>
+</dict>
+</plist>
+```
+
+注册：
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.yourname.git-reporter.plist
+```
+
+验证是否运行：
+
+```bash
+launchctl list | grep git-reporter
 ```
 
 ## 项目结构
 
 ```
-git_reporter/
+git-reporter/
 ├── config.py           # 配置加载
 ├── git_collector.py    # git log 采集与解析
-├── report_builder.py   # 数据归并、评分、排序
+├── report_builder.py   # 数据归并、跨 repo 去重、评分、排序
 ├── feishu_sender.py    # 飞书消息格式化与推送
+├── data_store.py       # 历史数据存储
+├── weekly_reporter.py  # 每周汇总报告
 ├── ai_summarizer.py    # AI 总结预留接口（初期为空）
 ├── main.py             # 入口
 ├── config.yaml.example # 配置模板
-└── tests/              # 30 个单元测试
+└── tests/              # 单元测试
 ```
 
 ## 测试
