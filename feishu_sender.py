@@ -1,5 +1,14 @@
 # feishu_sender.py
+from datetime import datetime
+
 import requests
+
+FEISHU_TIMEOUT_SECONDS = 20
+
+
+def _log(message: str) -> None:
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] {message}", flush=True)
 
 def _text(t: str) -> dict:
     return {"tag": "text", "text": t}
@@ -72,13 +81,22 @@ def build_payload(report: dict) -> dict:
 
 def send_report(webhook_url: str, report: dict) -> bool:
     payload = build_payload(report)
-    resp = requests.post(webhook_url, json=payload, timeout=10)
+    _log("开始发送飞书日报")
+    resp = requests.post(webhook_url, json=payload, timeout=FEISHU_TIMEOUT_SECONDS)
     resp.raise_for_status()
-    return resp.json().get("code") == 0
+    ok = resp.json().get("code") == 0
+    _log(f"飞书日报发送完成 success={ok}")
+    return ok
 
 def send_warnings(webhook_url: str, warnings: list[str]) -> None:
     if not warnings:
         return
     text = "⚠️ Git 报告采集警告：\n" + "\n".join(f"- {w}" for w in warnings)
-    resp = requests.post(webhook_url, json={"msg_type": "text", "content": {"text": text}}, timeout=10)
+    _log(f"开始发送飞书警告 count={len(warnings)}")
+    resp = requests.post(
+        webhook_url,
+        json={"msg_type": "text", "content": {"text": text}},
+        timeout=FEISHU_TIMEOUT_SECONDS,
+    )
     resp.raise_for_status()
+    _log("飞书警告发送完成")

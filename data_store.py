@@ -2,6 +2,7 @@ import json
 import os
 import sqlite3
 from datetime import date
+from pathlib import Path
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS daily_snapshots (
@@ -17,14 +18,23 @@ CREATE TABLE IF NOT EXISTS daily_snapshots (
 )
 """
 
+_DEFAULT_DB_PATH = str(Path(__file__).resolve().parent / "git_reporter.db")
+
+
+def _resolve_db_path(db_path: str) -> str:
+    if os.path.isabs(db_path):
+        return db_path
+    return str(Path(__file__).resolve().parent / db_path)
+
 def _connect(db_path: str) -> sqlite3.Connection:
+    db_path = _resolve_db_path(db_path)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute(_CREATE_TABLE)
     conn.commit()
     return conn
 
-def save_snapshot(report: dict, target_date: date, db_path: str = "git_reporter.db") -> None:
+def save_snapshot(report: dict, target_date: date, db_path: str = _DEFAULT_DB_PATH) -> None:
     """将 build_report() 返回的 report 写入 SQLite。同一 (date, person, repo) 幂等。"""
     date_str = target_date.isoformat()
     conn = _connect(db_path)
@@ -48,8 +58,9 @@ def save_snapshot(report: dict, target_date: date, db_path: str = "git_reporter.
     finally:
         conn.close()
 
-def query_range(start: date, end: date, db_path: str = "git_reporter.db") -> list[dict]:
+def query_range(start: date, end: date, db_path: str = _DEFAULT_DB_PATH) -> list[dict]:
     """返回 [start, end] 日期范围内的所有快照行，按 date ASC 排序。DB 不存在时返回 []。"""
+    db_path = _resolve_db_path(db_path)
     if not os.path.exists(db_path):
         return []
     conn = _connect(db_path)

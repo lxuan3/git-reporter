@@ -1,9 +1,16 @@
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import requests
 
 from config import Config
+
+FEISHU_TIMEOUT_SECONDS = 20
+
+
+def _log(message: str) -> None:
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] {message}", flush=True)
 
 
 def _find_backup_risks(rows: list[dict], week_start: date, week_end: date) -> list[dict]:
@@ -154,5 +161,7 @@ def send_weekly_report(webhook_url: str, report: dict) -> None:
             }
         },
     }
-    resp = requests.post(webhook_url, json=payload, timeout=10)
+    _log("开始发送飞书周报")
+    resp = requests.post(webhook_url, json=payload, timeout=FEISHU_TIMEOUT_SECONDS)
     resp.raise_for_status()
+    _log("飞书周报发送完成")

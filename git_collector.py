@@ -2,7 +2,12 @@
 import os
 import subprocess
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
+from typing import Optional
+
+GIT_CHECKOUT_TIMEOUT_SECONDS = 30
+GIT_PULL_TIMEOUT_SECONDS = 120
+GIT_LOG_TIMEOUT_SECONDS = 120
 
 @dataclass
 class CommitData:
@@ -13,6 +18,24 @@ class CommitData:
     files_changed: int
     lines_added: int
     lines_deleted: int
+
+
+def _log(message: str) -> None:
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] {message}", flush=True)
+
+
+def _summarize_process_output(result: Optional[subprocess.CompletedProcess]) -> str:
+    if result is None:
+        return "timeout"
+    parts = []
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    if stderr:
+        parts.append(f"stderr={stderr.splitlines()[0]}")
+    if stdout:
+        parts.append(f"stdout={stdout.splitlines()[0]}")
+    return " | ".join(parts) if parts else f"returncode={result.returncode}"
 
 def _parse_git_log(output: str) -> list[CommitData]:
     """解析 git log --format='COMMIT|%H|%ae|%an|%s' --numstat 的输出。"""
@@ -69,14 +92,30 @@ def _get_current_branch(repo_path: str) -> str:
     )
     return result.stdout.strip() or "main"
 
+
+def _run_git(
+    args: list[str],
+    repo_path: str,
+    timeout: int,
+) -> Optional[subprocess.CompletedProcess]:
+    try:
+        return subprocess.run(
+            args,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        _log(f"git 命令超时：repo={repo_path} cmd={' '.join(args)} timeout={timeout}s")
+        return None
+
 def _pull_branch(repo_path: str, branch: str) -> bool:
-    r1 = subprocess.run(["git", "checkout", branch, "--quiet"],
-                        cwd=repo_path, capture_output=True, text=True)
-    if r1.returncode != 0:
+    r1 = _run_git(["git", "checkout", branch, "--quiet"], repo_path, GIT_CHECKOUT_TIMEOUT_SECONDS)
+    if r1 is None or r1.returncode != 0:
         return False
-    r2 = subprocess.run(["git", "pull", "--quiet"],
-                        cwd=repo_path, capture_output=True, text=True)
-    return r2.returncode == 0
+    r2 = _run_git(["git", "pull", "--quiet"], repo_path, GIT_PULL_TIMEOUT_SECONDS)
+    return r2 is not None and r2.returncode == 0
 
 def _ensure_cloned(repo_path: str, remote: str) -> tuple[bool, str]:
     """本地路径不存在时自动 clone。返回 (success, warning_or_empty)。"""
@@ -111,25 +150,48 @@ def collect_repo(repo_path: str, branches: list[str], target_date: date, remote:
     warnings = []
 
     for branch in actual_branches:
-        if not _pull_branch(repo_path, branch):
-            warnings.append(f"git pull 失败：{repo_path} branch={branch}")
+        _log(f"开始采集：repo={repo_path} branch={branch}")
+        checkout = _run_git(["git", "checkout", branch, "--quiet"], repo_path, GIT_CHECKOUT_TIMEOUT_SECONDS)
+        if checkout is None or checkout.returncode != 0:
+            detail = _summarize_process_output(checkout)
+            warnings.append(f"git checkout 失败：{repo_path} branch={branch} ({detail})")
+            _log(f"采集失败：repo={repo_path} branch={branch} stage=checkout detail={detail}")
             continue
 
-        result = subprocess.run(
+        pull = _run_git(["git", "pull", "--quiet"], repo_path, GIT_PULL_TIMEOUT_SECONDS)
+        if pull is None or pull.returncode != 0:
+            detail = _summarize_process_output(pull)
+            warnings.append(f"git pull 失败：{repo_path} branch={branch} ({detail})")
+            _log(f"采集失败：repo={repo_path} branch={branch} stage=pull detail={detail}")
+            continue
+
+        result = _run_git(
             ["git", "log",
              f"--since={since}", f"--until={until}",
              "--format=COMMIT|%H|%ae|%an|%s",
              "--numstat", "--no-merges"],
-            cwd=repo_path, capture_output=True, text=True
+            repo_path,
+            GIT_LOG_TIMEOUT_SECONDS,
         )
 
-        if result.returncode != 0:
-            warnings.append(f"git log 失败：{repo_path} branch={branch}")
+        if result is None:
+            warnings.append(f"git log 超时：{repo_path} branch={branch}")
+            _log(f"采集失败：repo={repo_path} branch={branch} stage=log timeout={GIT_LOG_TIMEOUT_SECONDS}s")
             continue
 
+        if result.returncode != 0:
+            detail = _summarize_process_output(result)
+            warnings.append(f"git log 失败：{repo_path} branch={branch} ({detail})")
+            _log(f"采集失败：repo={repo_path} branch={branch} stage=log detail={detail}")
+            continue
+
+        branch_commits = 0
         for commit in _parse_git_log(result.stdout):
             if commit.hash not in seen:
                 seen.add(commit.hash)
                 all_commits.append(commit)
+                branch_commits += 1
+
+        _log(f"采集完成：repo={repo_path} branch={branch} commits={branch_commits}")
 
     return all_commits, warnings
