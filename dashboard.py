@@ -11,6 +11,25 @@ from git_collector import collect_repo
 from report_builder import build_report
 
 
+def _dedupe_persons(configured_persons: list[str], rows: list[dict]) -> list[str]:
+    """按显示名去重，并补上数据中出现但未配置的人员。"""
+    persons: list[str] = []
+    seen: set[str] = set()
+
+    for name in configured_persons:
+        if name not in seen:
+            seen.add(name)
+            persons.append(name)
+
+    for row in rows:
+        name = row["person"]
+        if name not in seen:
+            seen.add(name)
+            persons.append(name)
+
+    return persons
+
+
 def _build_all_data(rows: list[dict], persons: list[str], generated_at: "str | None" = None) -> dict:
     """将 query_range 返回的行转换为仪表盘所需的 JSON 数据结构。"""
     all_dates = sorted(set(r["date"] for r in rows))
@@ -381,6 +400,7 @@ def main():
     # 始终嵌入最多 90 天数据，时间范围选择器在前端过滤
     embed_start = today - timedelta(days=89)
     rows = query_range(embed_start, today)
+    persons = _dedupe_persons(list(cfg.members.values()), rows)
     html = generate_html(rows, persons, initial_range=args.days)
 
     output_path = os.path.abspath(args.output)

@@ -1,7 +1,7 @@
 # tests/test_dashboard.py
 import json
 from datetime import date, timedelta
-from dashboard import generate_html
+from dashboard import _dedupe_persons, generate_html
 
 def _rows(persons: list[str], repos: list[str], days: int) -> list[dict]:
     rows = []
@@ -57,6 +57,18 @@ def test_json_is_parseable():
     assert m, "ALL_DATA not found in HTML"
     data = _json.loads(m.group(1))
     assert data["persons"] == ["张三"]
+
+def test_dedupe_persons_merges_same_display_name_and_keeps_row_only_people():
+    rows = [
+        {"date": "2026-03-01", "person": "张三", "repo": "api",
+         "commits": 1, "lines_added": 10, "lines_deleted": 0, "files_changed": 1, "messages": []},
+        {"date": "2026-03-01", "person": "王五", "repo": "web",
+         "commits": 1, "lines_added": 5, "lines_deleted": 0, "files_changed": 1, "messages": []},
+    ]
+
+    persons = _dedupe_persons(["张三", "李四", "张三"], rows)
+
+    assert persons == ["张三", "李四", "王五"]
 
 def test_build_all_data_timeline_aggregation():
     """_build_all_data should sum commits across repos for the same person+day."""

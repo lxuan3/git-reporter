@@ -10,6 +10,7 @@
 - 自动识别 Conventional Commits 前缀（`feat` → 新功能、`fix` → 修复 等）
 - 报告按贡献评分排序，标注 🥇🥈 Top 2 贡献者
 - 支持每周汇总报告（`--weekly`）
+- 支持生成本地 HTML 仪表盘，查看团队趋势、成员活跃度和 repo 覆盖情况
 - 预留 AI 总结接口，初期不启用
 
 ## 报告示例
@@ -104,6 +105,14 @@ python3 main.py config.yaml
 python3 main.py config.yaml --weekly
 ```
 
+**生成本地仪表盘：**
+
+```bash
+python3 dashboard.py --config config.yaml
+```
+
+默认会生成 `dashboard.html` 并自动在浏览器中打开。可通过 `--days` 指定初始展示范围，通过 `--output` 指定输出文件路径；如需重新扫描 Git 历史并写入本地数据，可加 `--rescan`。
+
 ## 定时任务（macOS launchd）
 
 推荐使用 launchd 而非 crontab，锁屏不影响执行。
@@ -160,6 +169,7 @@ git-reporter/
 ├── feishu_sender.py    # 飞书消息格式化与推送
 ├── data_store.py       # 历史数据存储
 ├── weekly_reporter.py  # 每周汇总报告
+├── dashboard.py        # 本地 HTML 仪表盘生成与打开
 ├── ai_summarizer.py    # AI 总结预留接口（初期为空）
 ├── main.py             # 入口
 ├── config.yaml.example # 配置模板

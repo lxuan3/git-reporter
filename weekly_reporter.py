@@ -72,7 +72,7 @@ def build_weekly_report(rows: list[dict], cfg: Config, week_start: date) -> dict
     for row in prev_rows:
         prev_person_commits[row["person"]] += row["commits"]
 
-    all_names = list(cfg.members.values())
+    all_names = list(dict.fromkeys(cfg.members.values()))
 
     persons = []
     for name in all_names:
