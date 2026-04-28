@@ -110,13 +110,6 @@ def _run_git(
         _log(f"git 命令超时：repo={repo_path} cmd={' '.join(args)} timeout={timeout}s")
         return None
 
-def _pull_branch(repo_path: str, branch: str) -> bool:
-    r1 = _run_git(["git", "checkout", branch, "--quiet"], repo_path, GIT_CHECKOUT_TIMEOUT_SECONDS)
-    if r1 is None or r1.returncode != 0:
-        return False
-    r2 = _run_git(["git", "pull", "--quiet"], repo_path, GIT_PULL_TIMEOUT_SECONDS)
-    return r2 is not None and r2.returncode == 0
-
 def _ensure_cloned(repo_path: str, remote: str) -> tuple[bool, str]:
     """本地路径不存在时自动 clone。返回 (success, warning_or_empty)。"""
     if os.path.exists(repo_path):
@@ -158,11 +151,17 @@ def collect_repo(repo_path: str, branches: list[str], target_date: date, remote:
             _log(f"采集失败：repo={repo_path} branch={branch} stage=checkout detail={detail}")
             continue
 
-        pull = _run_git(["git", "pull", "--quiet"], repo_path, GIT_PULL_TIMEOUT_SECONDS)
-        if pull is None or pull.returncode != 0:
-            detail = _summarize_process_output(pull)
-            warnings.append(f"git pull 失败：{repo_path} branch={branch} ({detail})")
-            _log(f"采集失败：repo={repo_path} branch={branch} stage=pull detail={detail}")
+        fetch = _run_git(["git", "fetch", "--quiet", "origin"], repo_path, GIT_PULL_TIMEOUT_SECONDS)
+        if fetch is None or fetch.returncode != 0:
+            detail = _summarize_process_output(fetch)
+            warnings.append(f"git fetch 失败：{repo_path} branch={branch} ({detail})")
+            _log(f"采集失败：repo={repo_path} branch={branch} stage=fetch detail={detail}")
+            continue
+        reset = _run_git(["git", "reset", "--hard", f"origin/{branch}"], repo_path, GIT_CHECKOUT_TIMEOUT_SECONDS)
+        if reset is None or reset.returncode != 0:
+            detail = _summarize_process_output(reset)
+            warnings.append(f"git reset 失败：{repo_path} branch={branch} ({detail})")
+            _log(f"采集失败：repo={repo_path} branch={branch} stage=reset detail={detail}")
             continue
 
         result = _run_git(
